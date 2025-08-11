@@ -217,12 +217,55 @@ pipeline {
                                 --header "Content-Type: application/json" ^
                                 --header "X-HTTP-Method-Override: PATCH" ^
                                 --data "{\\"status\\":\\"CONFIGURED\\"}"
-                            """
+                           """
                         }
                     }
                 }
             }
         }
+		stage('Generate CSV') {
+            steps {
+                script {
+                    def csvContent = "X,Y\n1,10\n2,20\n3,15\n4,30\n"
+                    writeFile file: 'data.csv', text: csvContent
+                }
+            }
+        }
 
+        stage('Plot Graph') {
+            steps {
+                plot csvFileName: 'build-plot.csv',
+                     csvSeries: [[
+                         file: 'data.csv',
+                         displayTableFlag: false,
+                         inclusionFlag: 'OFF',
+                         url: ''
+                     ]],
+                     group: 'Build Metrics',
+                     style: 'line',
+                     title: 'Sample Build Data',
+                     yaxis: 'Value'
+            }
+        }
+
+
+    }//Stages end
+	
+	post {
+    always {
+        emailext(
+           
+            subject: "${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}!",
+            body: """Hi,
+
+${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}:
+
+Check console output at ${env.BUILD_URL} to view the results.
+""",
+recipientProviders: [[$class: 'RequesterRecipientProvider']]
+
+        )
     }
+}
+
 }
