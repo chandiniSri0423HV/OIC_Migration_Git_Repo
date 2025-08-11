@@ -217,54 +217,30 @@ pipeline {
                                 --header "Content-Type: application/json" ^
                                 --header "X-HTTP-Method-Override: PATCH" ^
                                 --data "{\\"status\\":\\"CONFIGURED\\"}"
-                           """
+                            """
                         }
                     }
                 }
             }
         }
-		stage('Generate CSV') {
-            steps {
-                script {
-                    def csvContent = "X,Y\n1,10\n2,20\n3,15\n4,30\n"
-                    writeFile file: 'data.csv', text: csvContent
-                }
-            }
-        }
+    }
 
-        stage('Plot Graph') {
-            steps {
-                plot csvFileName: 'build-plot.csv',
-                     csvSeries: [[
-                         file: 'data.csv',
-                         displayTableFlag: false,
-                         inclusionFlag: 'OFF',
-                         url: ''
-                     ]],
-                     group: 'Build Metrics',
-                     style: 'line',
-                     title: 'Sample Build Data',
-                     yaxis: 'Value'
-            }
-        }
-
-
-    }//Stages end
-	
-	post {
+   post {
     always {
-        emailext(
-           
-            subject: "${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}!",
-            body: """Hi,
+        // Create JUnit XML based on build result
+        script {
+            def status = currentBuild.currentResult == "SUCCESS" ? "pass" : "fail"
+            def xml = """<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="PipelineResult" tests="1" failures="${status == 'fail' ? 1 : 0}">
+    <testcase classname="Pipeline" name="RunStatus">
+        ${status == 'fail' ? '<failure message="Build Failed"/>' : ''}
+    </testcase>
+</testsuite>
+"""
+            writeFile file: "test-results/result.xml", text: xml
+        }
 
-${env.JOB_NAME} - Build #${env.BUILD_NUMBER} - ${currentBuild.currentResult}:
-
-Check console output at ${env.BUILD_URL} to view the results.
-""",
-recipientProviders: [[$class: 'RequesterRecipientProvider']]
-
-        )
+        junit 'test-results/*.xml'
     }
 }
 
